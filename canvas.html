@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>cavans</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+        
+        input[type=text] {
+            position: absolute;
+            bottom: 50px;
+            left: 50%;
+            font-size: 30px;
+            border-width: 0 0 5px 0;
+            border-style: solid;
+            border-color: #fff;
+            color: #fff;
+            text-align: center;
+            background-color: transparent;
+            transform: translateX(-50%);
+        }
+        
+        input[type=file] {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            background-color: #fff;
+            transform: translateX(-50%);
+        }
+        
+         :focus {
+            outline: 0;
+        }
+        
+         ::-moz-focus-inner {
+            border-color: transparent;
+        }
+        
+        canvas {
+            position: absolute;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas></canvas>
+    <input type="text" autofocus>
+    <input type="file">
+
+    <script>
+        (function() {
+            // 获取canvas画布
+            let canvasElem = document.getElementsByTagName('canvas')[0],
+                canvasContext = canvasElem.getContext('2d');
+
+            canvasElem.width = window.innerWidth;
+            canvasElem.height = window.innerHeight;
+
+            const QUANTITY = 100, //初始化圆点数量
+                MAX = canvasElem.width / 10, //渲染线的阀值(最大长度)
+                EASE = 20;
+
+            let dots = [], //圆点
+                lines = []; //线条
+
+            // 生成点
+            function makeDots() {
+                while (dots.length < QUANTITY) {
+                    dots.push({
+                        x: Math.random() * canvasElem.width, //x轴
+                        y: Math.random() * canvasElem.height, //y轴
+                        radius: Math.random() * 3, //半径
+
+                        vx: Math.random() - 0.5, //x轴加速度
+                        vy: Math.random() - 0.5, //y轴加速度
+
+                        isShapeDot: false, //是否文字点原点
+                        vr: 1 //半径切换速度
+                    });
+                }
+            }
+
+            // 生成线
+            function makeLines() {
+                lines = [];
+
+                dots.forEach(item1 => {
+                    dots.forEach(item2 => {
+                        if (item1 != item2 && !item1.isShapeDot) {
+                            // 勾股定理计算线长
+                            let lineLength = Math.sqrt(Math.pow(item1.x - item2.x, 2) + Math.pow(item1.y - item2.y, 2)),
+                                alpha = 1 - lineLength / MAX;
+
+                            // 如果线超过阀值则不渲染
+                            if (lineLength > MAX) return;
+
+                            // 如果是文字的点则更短且透明度更低
+                            if (item2.isShapeDot) {
+                                alpha = 0.2;
+
+                                if (lineLength > 50) return;
+                            }
+
+                            // 去掉亮点间重复的反向线（影响渲染性能）
+                            // lines.forEach(item => {
+                            //     if (item.start.x == item2.x && item.start.y == item2.y
+                            //         && item.end.x == item1.x && item.end.y == item1.y) {
+                            //         return;
+                            //     }
+                            // })
+
+                            lines.push({
+                                alpha, //线的透明度，越短越清晰
+                                start: { //起始点
+                                    x: item1.x,
+                                    y: item1.y
+                                },
+                                end: { //结束点
+                                    x: item2.x,
+                                    y: item2.y
+                                }
+                            })
+                        }
+                    });
+                })
+            }
+
+            function render() {
+                makeDots();
+                makeLines();
+
+                // 黑色背景
+                canvasContext.fillStyle = '#000';
+                canvasContext.fillRect(0, 0, canvasElem.width, canvasElem.height);
+
+                // 渲染线线
+                lines.forEach(item => {
+                    canvasContext.strokeStyle = '#fff';
+                    canvasContext.globalAlpha = item.alpha;
+
+                    canvasContext.beginPath();
+                    canvasContext.moveTo(item.start.x, item.start.y);
+                    canvasContext.lineTo(item.end.x, item.end.y);
+                    canvasContext.stroke();
+                })
+
+                // 渲染点
+                canvasContext.globalAlpha = 1;
+                dots.forEach(item => {
+                    canvasContext.fillStyle = '#fff';
+                    canvasContext.beginPath();
+                    canvasContext.arc(item.x, item.y, item.radius, 0, 2 * Math.PI);
+                    canvasContext.fill();
+                });
+            }
+
+            // 动起来
+            function animate() {
+                dots.forEach(item => {
+                    // 文字粒子切换大小，普通粒子改变位置
+                    if (item.isShapeDot) {
+                        item.radius += item.vr;
+
+                        item.radius >= 5 || item.radius <= 0.1 ? item.vr *= -1 : false;
+                        item.radius <= 0 ? item.radius = 0 : false;
+
+                        item.x += (item.dx - item.x) / EASE;
+                        item.y += (item.dy - item.y) / EASE;
+                    } else {
+                        item.x += item.vx;
+                        item.y += item.vy;
+
+                        // 如果到边界则反弹
+                        item.x < 0 || item.x > canvasElem.width ? item.vx *= -1 : false;
+                        item.y < 0 || item.y > canvasElem.height ? item.vy *= -1 : false;
+                    }
+                });
+
+                render();
+                window.requestAnimationFrame(animate);
+            }
+
+            // 添加鼠标控制
+            window.onmousemove = function(e) {
+                dots[0].x = e.clientX;
+                dots[0].y = e.clientY;
+            }
+
+            // 渲染形状
+            function renderShape(source) {
+                let canvas = document.createElement('canvas');
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+
+                let ctx = canvas.getContext('2d');
+
+                // if ((typeof source).toLowerCase() == 'string') {
+                // 写入文字
+                ctx.beginPath();
+                ctx.font = '200px arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('dd', window.innerWidth / 2 - 600, window.innerHeight / 2);
+                ctx.fill();
+                // } else {
+                // 画图
+                // if ((typeof source).toLowerCase() != 'string') {
+                // ctx.drawImage(source, (window.innerWidth - source.width) / 2, (window.innerHeight - source.height) / 2);
+                // ctx.drawImage(source, (window.innerWidth - source.width) / 2, (window.innerHeight - source.height) / 2);
+                // }
+                // }
+
+                ctx.beginPath();
+                ctx.font = '200px arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('d2', window.innerWidth / 2 + 600, window.innerHeight / 2);
+                ctx.fill();
+
+                let img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                // 8位无符号整型固定数组
+                console.log(img);
+
+                // 删除之前的文字圆点
+                dots = dots.filter(item => !item.isShapeDot);
+
+                for (let x = 0; x < img.width; x += 5) {
+                    for (let y = 0; y < img.height; y += 5) {
+                        let i = (x + y * img.width) * 4;
+                        if (img.data[i + 3] >= 128) {
+                            dots.push({
+                                isShapeDot: true,
+                                x: Math.random() * (Math.random() > 0.5 ? 1 : -1) * canvas.width * 2,
+                                y: Math.random() * (Math.random() > 0.5 ? 1 : -1) * canvas.height * 2,
+                                dx: x,
+                                dy: y,
+                                radius: Math.random() * 4,
+                                vr: Math.random() * 0.3,
+                            });
+                        }
+                    }
+                }
+            }
+
+            // 监听input回车事件
+            document.getElementsByTagName('input')[0].addEventListener('keyup', (e) => {
+                if (e.keyCode == 13) {
+                    renderShape(e.target.value);
+                    e.target.value = '';
+                }
+            }, false);
+
+            animate();
+            // renderShape('');
+
+            let image = new Image();
+            image.src = './1.png';
+            image.onload = function() {
+                renderShape(image);
+            }
+        })();
+    </script>
+</body>
+
+</html>
